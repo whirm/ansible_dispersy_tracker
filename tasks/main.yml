@@ -1,0 +1,52 @@
+---
+# tasks file for whirm.dispersy_tracker
+
+- name: Create dispersy_tracker group
+  group: name=dispersy_tracker
+
+- name: Create dispersy_tracker user
+  user: name=dispersy_tracker group=dispersy_tracker home=/var/lib/dispersy_tracker
+
+- name: Install systemd unit
+  command: cp /opt/dispersy/scripts/dispersy-tracker@.service /etc/systemd/system/
+  register: service_file
+
+#
+# Log sync section
+#
+
+- name: Add the remote log collector private key to the dispersy_tracker user
+  copy: src=ssh_keys/fetched/dispersy_collector.id_rsa
+        dest=/var/lib/dispersy_tracker/.ssh/id_rsa
+        owner=dispersy_tracker
+        group=dispersy_tracker
+        mode=600
+        directory_mode=700
+
+- name: Install the log sync service unit
+  command: cp /opt/dispersy/scripts/tracker-log-sync.service /etc/systemd/system/tracker-log-sync.service
+  register: sync_service_file
+
+- name: Install the log sync timer unit
+  command: cp /opt/dispersy/scripts/tracker-log-sync.timer /etc/systemd/system/tracker-log-sync.timer
+  register: sync_timer_file
+
+- name: Reload systemd
+  shell: systemctl daemon-reload
+  when: service_file.changed or sync_service_file.changed or sync_timer_file.changed
+
+#
+# Common section
+#
+
+- name: Enable one tracker service per configured port
+  service: name=dispersy-tracker@{{item}}.service enabled=yes state=restarted
+  with_items: "{{dispersy_tracker_ports}}"
+
+- name: Start the tracker log sync timer
+  service: name=tracker-log-sync.timer enabled=yes state=restarted
+  when: sync_timer_file.changed
+
+- name: Make sure the services are running.
+  service: name=dispersy-tracker@{{item}}.service enabled=yes state=started
+  with_items: "{{dispersy_tracker_ports}}"

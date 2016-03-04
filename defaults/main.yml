@@ -1,0 +1,7 @@
+---
+# defaults file for whirm.dispersy_tracker
+
+dispersy_tracker_ports:
+  - 6421
+
+dispersy_collector_home_dir: /var/lib/collected_dispersy_logs
